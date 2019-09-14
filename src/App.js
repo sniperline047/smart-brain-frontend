@@ -9,12 +9,7 @@ import Facedemo from './components/Facedemo/Facedemo.js';
 import FaceDetect from './components/FaceDetect/FaceDetect.js';
 import SignIn from './components/SignIn/SignIn.js';
 import Register from './components/Register/Register.js';
-import Clarifai from 'clarifai'; 
 import './App.css';
-
-const app = new Clarifai.App({
- apiKey: '7109bda60779429fb587a65ef636a55d'
-});
 
 const particlesOption = {
   particles : {
@@ -28,28 +23,30 @@ const particlesOption = {
   }
 }
 
+const initialState = {
+  input: ' ',
+  imageURL: '',
+  route: 'signin',
+  isSignedIn: false,
+  mode: 'Demographics',
+  face_box: {},
+  face_demo: {
+    age: '',
+    gender: '',
+    ethnicity: ''
+  },
+  user: {
+    id: '',
+    name: '',
+    email: '',
+    entries: 0,
+  },
+}
+
 class App extends Component {
   constructor() {
     super();
-    this.state = {
-      input: ' ',
-      imageURL: '',
-      route: 'signin',
-      isSignedIn: false,
-      mode: 'Demographics',
-      face_box: {},
-      face_demo: {
-        age: '',
-        gender: '',
-        ethnicity: ''
-      },
-      user: {
-        id: '',
-        name: '',
-        email: '',
-        entries: 0,
-      },
-    }
+    this.state = initialState;
   }
 
   loadUser = (data) => {
@@ -63,8 +60,7 @@ class App extends Component {
 
   clearInput = () => {
     this.setState({ input: '' });
-    this.setState({ imageURL: '' });
-    this.setState({ face_box: {} });
+    this.setState({imageURL: ''});
   }
 
   onRouteChange = (check) => {
@@ -109,37 +105,65 @@ class App extends Component {
     event.preventDefault();
     this.setState({ imageURL: this.state.input});
     if( this.state.mode === 'Demographics' ) {
-      app.models.predict(Clarifai.DEMOGRAPHICS_MODEL,this.state.input)
+      fetch('http://localhost:5000/imagedemo', {
+        method: 'post',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          input: this.state.input
+        })
+      })
+      .then(response => response.json())
       .then(response => {
         if(response) {
           fetch('http://localhost:5000/image', {
             method: 'put',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
-              id: this.state.user.id,
+              id: this.state.user.id
             })
           })
-            .then(response => response.json())
-            .then(count => {
-              this.setState(Object.assign(this.state.user, { entries: count}))
-            })
-            .catch(err => console.log(err)); 
+          .then(resp => resp.json())
+          .then(count => {
+            this.setState(Object.assign(this.state.user, { entries: count}))
+          })
+          .catch(err => console.log(err)); 
         }
         this.getDemographics(response)
       })
-      .catch(err => console.log(err));    
+      .catch(err => alert('Wrong format'));    
     } else {
-      app.models.predict(Clarifai.FACE_DETECT_MODEL,this.state.input)
-      .then(response => {
-        this.displayFaceBox(this.calculateFaceLocation(response))
-      })
-      .catch(err => console.log(err)); 
+        fetch('http://localhost:5000/imageface', {
+          method: 'post',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            input: this.state.input
+          })
+        })
+        .then(response => response.json())
+        .then(response => {
+          if(response) {
+            fetch('http://localhost:5000/image', {
+              method: 'put',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({
+                id: this.state.user.id
+              })
+            })
+              .then(resp => resp.json())
+              .then(count => {
+                this.setState(Object.assign(this.state.user, { entries: count}))
+              })
+              .catch(err => console.log(err)); 
+          }
+          this.displayFaceBox(this.calculateFaceLocation(response))
+        })
+        .catch(err => alert('Wrong format')); 
     }
   }
 
   onRouteChange = (route) => {
     if (route === 'signout') {
-      this.setState({isSignedIn: false})
+      this.setState(initialState)
     } else if (route === 'home') {
       this.setState({isSignedIn: true})
     }
@@ -192,3 +216,4 @@ class App extends Component {
 }
 
 export default App;
+
